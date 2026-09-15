@@ -136,6 +136,22 @@ fun main(args: Array<String>) {
 
 	val configDir = resolveConfig()
 	LogManager.info("Using config dir: $configDir")
+	// A config file named from outside that is not there is a mistake, not a
+	// first run: starting on a fresh config would drop every tracker's body
+	// part and keep recording as if nothing had changed.
+	if (System.getenv(CONFIG_FILE_ENV) != null && !Path(configDir).exists()) {
+		val message = "SlimeVR start-up error! $CONFIG_FILE_ENV names $configDir, which does not exist."
+		LogManager.severe(message)
+		JOptionPane
+			.showMessageDialog(
+				null,
+				message,
+				"SlimeVR: Config file missing",
+				JOptionPane.ERROR_MESSAGE,
+			)
+		LogManager.closeLogger()
+		return
+	}
 
 	val configManager = ConfigManager(configDir)
 	configManager.loadConfig()
@@ -339,7 +355,16 @@ fun tryOpenUri(uri: String) {
 }
 
 const val CONFIG_FILENAME = "vrconfig.yml"
+
+// The full path of the config file to use instead of the usual one. The rig
+// keeps its SlimeVR config with the rest of its hardware description, so the
+// server reads and saves it there.
+const val CONFIG_FILE_ENV = "SLIMEVR_CONFIG_FILE"
+
 fun resolveConfig(): String {
+	System.getenv(CONFIG_FILE_ENV)?.takeIf { it.isNotBlank() }?.let {
+		return Path(it).toAbsolutePath().pathString
+	}
 	// If config folder exists, then save config on relative path
 	if (Path("config/").exists()) {
 		return CONFIG_FILENAME
